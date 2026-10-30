@@ -122,7 +122,28 @@ function attachFootballSuggestions(inputId,listId,kind){
  });
 }
 attachFootballSuggestions('player','playerSuggestions','player');
+
 attachFootballSuggestions('club','clubSuggestions','club');
+// Serie-/sæt-autocomplete med samme søgeoplevelse som spiller og klub.
+function attachSetSuggestions(){
+ const input=$('set'),list=$('setSuggestions');
+ const series=[
+ "Topps Chrome","Topps Chrome UEFA Club Competitions","Topps Chrome Premier League","Topps Chrome Bundesliga","Topps Chrome Ligue 1","Topps Chrome Serie A","Topps Chrome LaLiga","Topps Chrome UEFA Women's Champions League",
+ "Topps Premier League","Topps Premier League Flagship","Topps Premier League 2026/27","Topps Merlin","Topps Merlin UEFA Club Competitions","Topps Finest","Topps Stadium Club","Topps Stadium Club Chrome","Topps Museum Collection","Topps Dynasty","Topps Inception","Topps Match Attax","Topps UEFA Club Competitions","Topps Now","Topps Deco","Topps Gold Label","Topps Tier One","Topps Definitive","Topps Tribute","Topps UEFA Euro","Topps FIFA World Cup",
+ "Panini Prizm","Panini Prizm Premier League","Panini Prizm World Cup","Panini Select","Panini Donruss","Panini Donruss Optic","Panini Obsidian","Panini Immaculate","Panini National Treasures","Panini Mosaic","Panini Chronicles","Panini FIFA 365","Panini Adrenalyn XL","Panini Score","Panini Revolution","Panini Contenders","Panini Spectra","Panini Flawless","Panini Noir","Panini Mega Cracks",
+ "Match Attax","Topps Living Set","Topps Project 22","Topps  Chrome Sapphire","Topps UEFA Champions League","Panini World Cup Stickers","Panini EURO Stickers"
+ ];
+ const norm=value=>value.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase();
+ function update(){
+  const q=norm(input.value.trim());
+  if(q.length<1){list.replaceChildren(...series.map(name=>{const o=document.createElement('option');o.value=name;return o}));return}
+  const matches=series.filter(name=>{const n=norm(name);return n.startsWith(q)||n.split(/\\s+/).some(word=>word.startsWith(q))});
+  list.replaceChildren(...matches.slice(0,25).map(name=>{const o=document.createElement('option');o.value=name;return o}));
+ }
+ input.addEventListener('input',update);
+ input.addEventListener('focus',update);
+}
+attachSetSuggestions();
 function render(){const total=cards.reduce((s,c)=>s+(Number(c.price)||0),0);$('statCount').textContent=cards.length;$('statValue').textContent=money(total);$('statAutos').textContent=cards.filter(isAuto).length;$('statNumbered').textContent=cards.filter(isNum).length;$('profileCount').textContent=cards.length;$('profileValue').textContent=money(total);$('profileName').textContent=profile;$('nameInput').value=profile;
 let list=cards.filter(c=>(c.player+' '+c.club+' '+c.brand+' '+(c.set||'')).toLowerCase().includes($('search').value.toLowerCase()));const f=$('filter').value;if(f==='auto')list=list.filter(isAuto);if(f==='numbered')list=list.filter(isNum);if(f==='relic')list=list.filter(c=>c.type==='Relic');if(f==='base')list=list.filter(c=>c.type==='Base');if($('sort').value==='az')list.sort((a,b)=>a.player.localeCompare(b.player));if($('sort').value==='value')list.sort((a,b)=>(Number(b.price)||0)-(Number(a.price)||0));$('collectionGrid').replaceChildren(...list.map(c=>cardElement(c,'collection')));$('collectionEmpty').style.display=list.length?'none':'block';$('collectionCount').textContent=list.length+' kort vist';
 const q=$('dbSearch').value.toLowerCase(),b=$('dbBrand').value,t=$('dbType').value;const matches=database.filter(c=>(c.player+' '+c.club+' '+(c.set||'')).toLowerCase().includes(q)&&(b==='all'||c.brand===b)&&(t==='all'||c.type===t));$('databaseGrid').replaceChildren(...matches.map(c=>cardElement(c,'database')));$('databaseEmpty').style.display=matches.length?'none':'block';const rare=cards.filter(c=>isAuto(c)||isNum(c)||c.type==='Relic');$('rareGrid').replaceChildren(...rare.map(c=>cardElement(c,'collection')));$('rareEmpty').style.display=rare.length?'none':'block';$('rareAutos').textContent=cards.filter(isAuto).length;$('rareNumbered').textContent=cards.filter(isNum).length;$('rareBoth').textContent=cards.filter(c=>isAuto(c)&&isNum(c)).length;$('rareRelics').textContent=cards.filter(c=>c.type==='Relic').length;$('wishlistGrid').replaceChildren(...wishlist.map(c=>cardElement(c,'wishlist')));$('wishlistEmpty').style.display=wishlist.length?'none':'block';renderValue(total)}
