@@ -147,7 +147,7 @@ function addVisibleAutocomplete(inputId,kind){
    option.addEventListener('mouseleave',()=>option.style.background='#fff');
    menu.append(option);
   });
-  if(!values.length){hide();return}
+  if(!values.length&&!label){hide();return}
   position();menu.style.display='block';
  }
  async function searchPlayersOnline(q,id,localMatches){
@@ -195,12 +195,12 @@ function addVisibleAutocomplete(inputId,kind){
     }catch(e){return null}
    }));
    if(id!==requestId||norm(input.value)!==q)return;
-   const seen=new Set(localMatches.map(norm));
-   const extra=verified.filter(Boolean).filter(name=>!seen.has(norm(name)));
-   show([...localMatches,...extra].slice(0,16),extra.length?'Spillere fra CardVault + verificeret spillerdatabase':'Kun verificerede fodboldspillere');
+   const verifiedNames=[...new Set(verified.filter(Boolean))];
+   show(verifiedNames.slice(0,16),verifiedNames.length?'Verificerede fodboldspillere':'Ingen verificerede fodboldspillere fundet');
   }catch(error){
-   // Local, curated player suggestions remain available if the external
-   // database is unavailable or takes too long to respond.
+   if(id===requestId&&norm(input.value)===q){
+    show([],'Kunne ikke kontrollere spillerne. Prøv igen om lidt.');
+   }
   }
  }
  function update(){
@@ -216,8 +216,14 @@ function addVisibleAutocomplete(inputId,kind){
     return queryWords.every(qw=>nameWords.some(nw=>(qw.length>=5&&editDistance(qw,nw)<=2)||(qw.length>=3&&editDistance(qw,nw)<=1)));
    });
   }
-  show(matches.slice(0,16),matches.length?'Spillerforslag':'Søger i spillerdatabasen…');
-  if(kind==='player')debounceTimer=setTimeout(()=>searchPlayersOnline(q,id,matches),250);
+  if(kind==='player'){
+   // Never show the local name list before the external player check finishes.
+   // This prevents any unverified name from appearing as a player suggestion.
+   show([],'Kontrollerer, at resultaterne er fodboldspillere…');
+   debounceTimer=setTimeout(()=>searchPlayersOnline(q,id,matches),250);
+  }else{
+   show(matches.slice(0,16),matches.length?'Forslag':'Ingen forslag');
+  }
  }
  input.addEventListener('input',update);
  input.addEventListener('focus',update);
