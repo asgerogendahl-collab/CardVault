@@ -158,7 +158,7 @@ function addVisibleAutocomplete(inputId,kind){
     search:input.value.trim(),
     language:'en',
     uselang:'en',
-    limit:'30',
+    limit:'50',
     format:'json',
     origin:'*'
    });
@@ -166,15 +166,19 @@ function addVisibleAutocomplete(inputId,kind){
    if(!response.ok)throw new Error('Player search unavailable');
    const data=await response.json();
    if(id!==requestId||norm(input.value)!==q)return;
-   // Wikidata search also returns objects (e.g. statues). Only accept entities
-   // whose actual Wikidata instance/type hierarchy identifies a footballer.
-   const candidates=(data.search||[]).filter(item=>{
-    const desc=(item.description||'').toLowerCase();
-    const label=(item.label||'').toLowerCase();
-    const isFootballer=/association football player|footballer|soccer player|professional football player|women's footballer|men's footballer/.test(desc);
-    const isClearlyNotPlayer=/statue|sculpture|film|song|album|book|video game|stadium|club|team|award|brand|museum|building|monument/.test(desc+' '+label);
-    return item.id&&item.label&&isFootballer&&!isClearlyNotPlayer;
-   }).slice(0,20);
+
+   // Search results are only candidates. A result is displayed only after
+   // Wikidata confirms BOTH that it is a human and that its occupation is
+   // association football player. This blocks statues, stadiums, clubs, etc.
+   const candidates=(data.search||[])
+    .filter(item=>item.id&&item.label)
+    .filter(item=>!/(statue|sculpture|film|song|album|book|video game|stadium|club|team|award|brand|museum|building|monument)/i.test((item.label||'')+' '+(item.description||'')))
+    .sort((a,b)=>{
+      const exactA=norm(a.label)===q?1:0, exactB=norm(b.label)===q?1:0;
+      return exactB-exactA;
+    })
+    .slice(0,40);
+
    const verified=await Promise.all(candidates.map(async item=>{
     try{
      const detailUrl='https://www.wikidata.org/wiki/Special:EntityData/'+encodeURIComponent(item.id)+'.json';
@@ -182,10 +186,13 @@ function addVisibleAutocomplete(inputId,kind){
      if(!detailResponse.ok)return null;
      const detail=await detailResponse.json();
      const entity=detail.entities&&detail.entities[item.id];
-     const claims=entity&&entity.claims&&entity.claims.P106||[];
-     const occupations=claims.map(claim=>claim.mainsnak&&claim.mainsnak.datavalue&&claim.mainsnak.datavalue.value&&claim.mainsnak.datavalue.value.id).filter(Boolean);
-     // Q937857 = association football player; reject broad/ambiguous search hits.
-     return occupations.includes('Q937857')?item.label:null;
+     const claims=entity&&entity.claims||{};
+     const idsFor=property=>(claims[property]||[])
+      .map(claim=>claim.mainsnak&&claim.mainsnak.datavalue&&claim.mainsnak.datavalue.value&&claim.mainsnak.datavalue.value.id)
+      .filter(Boolean);
+     const isHuman=idsFor('P31').includes('Q5');
+     const isFootballer=idsFor('P106').includes('Q937857');
+     return isHuman&&isFootballer?item.label:null;
     }catch(e){return null}
    }));
    if(id!==requestId||norm(input.value)!==q)return;
@@ -193,7 +200,8 @@ function addVisibleAutocomplete(inputId,kind){
    const extra=verified.filter(Boolean).filter(name=>!seen.has(norm(name)));
    show([...localMatches,...extra].slice(0,16),extra.length?'Spillere fra CardVault + verificeret spillerdatabase':'Kun verificerede fodboldspillere');
   }catch(error){
-   // Local suggestions remain available if the external source is unavailable.
+   // Local, curated player suggestions remain available if the external
+   // database is unavailable or takes too long to respond.
   }
  }
  function update(){
