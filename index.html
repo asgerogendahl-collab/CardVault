@@ -95,11 +95,11 @@ const popularClubs=["Arsenal","Aston Villa","AFC Bournemouth","Brentford","Brigh
 function attachFootballSuggestions(inputId,listId,kind){
  const input=$(inputId),list=$(listId);let timer=null,controller=null,lastQuery='';
  const seed=kind==='player'?popularPlayers:popularClubs;
- const norm=value=>value.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase();
+ const norm=value=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();
  function showMatches(extra=[]){
   const q=norm(input.value.trim());if(q.length<2){list.replaceChildren();return}
   const combined=[...seed,...extra],unique=new Map();
-  combined.filter(name=>{const n=norm(name);return n.startsWith(q)||n.split(/\\s+/).some(word=>word.startsWith(q))})
+  combined.filter(name=>{const n=norm(name);return n.startsWith(q)||n.split(/\s+/).some(word=>word.startsWith(q))})
    .forEach(name=>{const k=norm(name);if(!unique.has(k))unique.set(k,name)});
   list.replaceChildren(...[...unique.values()].slice(0,20).map(name=>{const option=document.createElement('option');option.value=name;return option}));
  }
