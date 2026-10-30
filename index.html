@@ -115,31 +115,25 @@ function addVisibleAutocomplete(inputId,kind){
  const source=kind==='player'?popularPlayers:kind==='club'?popularClubs:seriesSuggestions;
  const menu=document.createElement('div');
  menu.className='autocomplete-menu';
- menu.style.cssText='display:none;position:fixed;max-height:240px;overflow-y:auto;background:#fff;border:1px solid #9bc9f2;border-radius:10px;box-shadow:0 10px 28px #173c642e;z-index:99999;padding:5px;overscroll-behavior:contain';
+ menu.style.cssText='display:none;position:fixed;max-height:260px;overflow-y:auto;background:#fff;border:1px solid #9bc9f2;border-radius:10px;box-shadow:0 10px 28px #173c642e;z-index:99999;padding:5px;overscroll-behavior:contain';
  document.body.append(menu);
+ let requestId=0, debounceTimer;
  function hide(){menu.style.display='none'}
  function position(){
   const r=input.getBoundingClientRect();
   menu.style.left=Math.max(8,Math.min(r.left,window.innerWidth-Math.max(r.width,220)-8))+'px';
   menu.style.width=Math.min(Math.max(r.width,220),window.innerWidth-16)+'px';
-  menu.style.top=Math.max(8,Math.min(r.bottom+4,window.innerHeight-250))+'px';
+  menu.style.top=Math.max(8,Math.min(r.bottom+4,window.innerHeight-270))+'px';
  }
- function update(){
-  const q=norm(input.value.trim());
+ function show(values,label){
   menu.replaceChildren();
-  if(q.length<2){hide();return}
-  let matches=source.filter(v=>norm(v).includes(q));
-  // Hvis der ikke er et direkte match, tillad små stavefejl i navne.
-  if(!matches.length && kind==='player' && q.length>=4){
-   const queryWords=q.split(/\\s+/).filter(Boolean);
-   matches=source.filter(name=>{
-    const nameWords=norm(name).split(/\\s+/);
-    return queryWords.every(qw=>nameWords.some(nw=>qw.length>=5 && editDistance(qw,nw)<=2 || qw.length>=3 && editDistance(qw,nw)<=1));
-   });
+  if(label){
+   const heading=document.createElement('div');
+   heading.textContent=label;
+   heading.style.cssText='padding:6px 10px;color:#6480a3;font-size:11px;font-weight:700';
+   menu.append(heading);
   }
-  matches=matches.slice(0,14);
-  if(!matches.length){hide();return}
-  matches.forEach(value=>{
+  values.slice(0,16).forEach(value=>{
    const option=document.createElement('button');
    option.type='button';option.textContent=value;
    option.style.cssText='display:block;width:100%;text-align:left;padding:9px 11px;border:0;border-radius:7px;background:#fff;color:#15345f;cursor:pointer;font:inherit';
@@ -153,13 +147,50 @@ function addVisibleAutocomplete(inputId,kind){
    option.addEventListener('mouseleave',()=>option.style.background='#fff');
    menu.append(option);
   });
+  if(!values.length){hide();return}
   position();menu.style.display='block';
+ }
+ async function searchPlayersOnline(q,id,localMatches){
+  if(kind!=='player'||q.length<2)return;
+  try{
+   const url='https://www.wikidata.org/w/api.php?action=wbsearchentities&search='+encodeURIComponent(input.value.trim())+'&language=en&uselang=en&limit=20&format=json&origin=*';
+   const response=await fetch(url);
+   if(!response.ok)throw new Error('Player search unavailable');
+   const data=await response.json();
+   if(id!==requestId||norm(input.value)!==q)return;
+   const footballTerms=/footballer|soccer player|association football|football player|goalkeeper|striker|midfielder|defender|forward/i;
+   const online=(data.search||[])
+    .filter(item=>item.label&&item.description&&footballTerms.test(item.description))
+    .map(item=>item.label);
+   const seen=new Set(localMatches.map(norm));
+   const extra=online.filter(name=>!seen.has(norm(name))&&!seen.has(norm(name)));
+   const combined=[...localMatches,...extra].slice(0,16);
+   show(combined,extra.length?'Spillere fra CardVault + global database':'Spillerforslag');
+  }catch(error){
+   // Den lokale søgning virker stadig, hvis den eksterne database er nede.
+  }
+ }
+ function update(){
+  const q=norm(input.value.trim()),id=++requestId;
+  clearTimeout(debounceTimer);
+  menu.replaceChildren();
+  if(q.length<2){hide();return}
+  let matches=source.filter(v=>norm(v).includes(q));
+  if(!matches.length&&kind==='player'&&q.length>=4){
+   const queryWords=q.split(/\\s+/).filter(Boolean);
+   matches=source.filter(name=>{
+    const nameWords=norm(name).split(/\\s+/);
+    return queryWords.every(qw=>nameWords.some(nw=>(qw.length>=5&&editDistance(qw,nw)<=2)||(qw.length>=3&&editDistance(qw,nw)<=1)));
+   });
+  }
+  show(matches.slice(0,16),matches.length?'Spillerforslag':'Søger i spillerdatabasen…');
+  if(kind==='player')debounceTimer=setTimeout(()=>searchPlayersOnline(q,id,matches),250);
  }
  input.addEventListener('input',update);
  input.addEventListener('focus',update);
  input.addEventListener('click',update);
  input.addEventListener('keydown',e=>{if(e.key==='Escape')hide()});
- input.addEventListener('blur',()=>setTimeout(hide,150));
+ input.addEventListener('blur',()=>setTimeout(hide,180));
  window.addEventListener('resize',()=>{if(menu.style.display==='block')position()});
  window.addEventListener('scroll',()=>{if(menu.style.display==='block')position()},true);
 }
