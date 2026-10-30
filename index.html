@@ -114,8 +114,9 @@ function addVisibleAutocomplete(inputId,kind){
  }
  function update(){
   const q=norm(input.value.trim());
-  const matches=(q?source.filter(v=>norm(v).includes(q)):source).slice(0,14);
   menu.replaceChildren();
+  if(q.length<2){hide();return}
+  const matches=source.filter(v=>norm(v).includes(q)).slice(0,14);
   if(!matches.length){hide();return}
   matches.forEach(value=>{
    const option=document.createElement('button');
