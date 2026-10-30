@@ -172,7 +172,6 @@ function addVisibleAutocomplete(inputId,kind){
    // association football player. This blocks statues, stadiums, clubs, etc.
    const candidates=(data.search||[])
     .filter(item=>item.id&&item.label)
-    .filter(item=>!/(statue|sculpture|film|song|album|book|video game|stadium|club|team|award|brand|museum|building|monument)/i.test((item.label||'')+' '+(item.description||'')))
     .sort((a,b)=>{
       const exactA=norm(a.label)===q?1:0, exactB=norm(b.label)===q?1:0;
       return exactB-exactA;
