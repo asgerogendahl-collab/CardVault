@@ -31,29 +31,38 @@ function isNum(c){return c.type.includes('Nummereret')||!!c.number}
 function switchPage(name){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+name));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.page===name))}
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchPage(t.dataset.page)));
 function cardElement(c,source){const el=document.createElement('article');el.className='card';if(c.image){const im=document.createElement('img');im.src=c.image;im.alt='Kort med '+c.player;el.append(im)}else{const ph=document.createElement('div');ph.className='noimg';ph.textContent='⚽';el.append(ph)}const body=document.createElement('div');body.className='cardbody';const tag=document.createElement('span');tag.className='tag';tag.textContent=c.brand;const h=document.createElement('h3');h.textContent=c.player;const meta=document.createElement('div');meta.className='meta';meta.textContent=(c.club||'Ukendt klub')+' · '+c.type;const details=document.createElement('div');details.className='meta';details.textContent=[c.set,c.number].filter(Boolean).join(' · ');const foot=document.createElement('div');foot.className='cardfoot';const val=document.createElement('span');val.className='price';val.textContent=money(c.price);const action=document.createElement('button');action.className='btn secondary tiny';if(source==='database'){action.textContent='＋ Saml';action.addEventListener('click',()=>{cards.unshift({...c,id:crypto.randomUUID?.()||String(Date.now()),addedAt:Date.now()});if(persist())render();})}else if(source==='wishlist'){action.textContent='Føj til samling';action.addEventListener('click',()=>{cards.unshift({...c,id:crypto.randomUUID?.()||String(Date.now()),addedAt:Date.now()});wishlist=wishlist.filter(x=>x.id!==c.id);persist();render()})}else{action.textContent='Fjern';action.addEventListener('click',()=>{if(confirm('Vil du fjerne '+c.player+' fra samlingen?')){cards=cards.filter(x=>x.id!==c.id);persist();render()}})}foot.append(val,action);body.append(tag,h,meta,details,foot);el.append(body);return el}
-// Live-forslag fra Wikidata: bred international søgning efter spillere og klubber.
+// Smarte autoforslag: vis kun navne, der passer til det, samleren allerede har skrevet.
+const popularPlayers=[
+"Martin Ødegaard","Cole Palmer","Conor Gallagher","Cristiano Ronaldo","Lionel Messi","Kylian Mbappé","Erling Haaland","Jude Bellingham","Lamine Yamal","Pedri","Raphinha","Vinícius Júnior","Harry Kane","Jamal Musiala","Florian Wirtz","Mohamed Salah","Virgil van Dijk","Bukayo Saka","Declan Rice","Gabriel Martinelli","William Saliba","David Raya","Kai Havertz","Gabriel Jesus","Leandro Trossard","Jurrien Timber","Ben White","Myles Lewis-Skelly","Ethan Nwaneri","Bruno Fernandes","Kevin De Bruyne","Son Heung-min","Phil Foden","Rodri","Bernardo Silva","Rúben Dias","Marcus Rashford","Mason Mount","Alejandro Garnacho","Amad Diallo","Rasmus Højlund","Victor Gyökeres","Alexander Isak","Anthony Gordon","Bruno Guimarães","Sandro Tonali","Virgil van Dijk","Trent Alexander-Arnold","Dominik Szoboszlai","Alexis Mac Allister","Cody Gakpo","Luis Díaz","Darwin Núñez","Diogo Jota","Robert Lewandowski","Ferran Torres","Dani Olmo","Gavi","Frenkie de Jong","Ronald Araújo","Jules Koundé","Thibaut Courtois","Kylian Mbappé","Endrick","Rodrygo","Julián Álvarez","Antoine Griezmann","Lautaro Martínez","Paulo Dybala","Victor Osimhen","Khvicha Kvaratskhelia","Rafael Leão","Christian Pulisic","Olivier Giroud","Bukayo Saka","Martinelli","Martin Zubimendi","Nico Williams","Mikel Merino","Viktor Boniface","Victor Boniface","Aleksandar Pavlović","Joshua Kimmich","Dayot Upamecano","Manuel Neuer","Thomas Müller","Serge Gnabry","Leroy Sané","Deniz Undav","Jamie Bynoe-Gittens","Jadon Sancho","Serhou Guirassy","Nico Schlotterbeck","Granit Xhaka","Patrik Schick","Mats Hummels","Christian Eriksen","Pierre-Emile Højbjerg","Mikkel Damsgaard","Rasmus Højlund","Kasper Schmeichel","Andreas Christensen","Thomas Delaney","Albert Grønbæk","Jens Stage","Roony Bardghji","Victor Torp","Jesper Lindstrøm","Neco Williams","Andreas Skov Olsen","Joachim Andersen","Morten Hjulmand","Yussuf Poulsen","Jonas Wind","Simon Kjær","Rasmus Kristensen","Matt O'Riley","Mohamed Daramy","Patrick Dorgu","Conrad Harder","Mika Biereth","Patrick Mortensen","Gift Links","Tobias Bech","Frederik Tingager","Mads Emil Madsen","Kevin Yakob","Dario Osorio","Alexander Bah","Elias Jelert","Søren Tengstedt","Nicklas Helenius","Kasper Dolberg","Anders Dreyer","Morten Frendrup","Filip Jørgensen","Emiliano Martínez","David Beckham","Zlatan Ibrahimović","Wayne Rooney","Thierry Henry","Dennis Bergkamp","Patrick Vieira","Cesc Fàbregas","Sergio Agüero","Eden Hazard","Ronaldinho","Neymar","Luis Suárez","Sergio Ramos","Xavi","Andrés Iniesta","Iker Casillas","Gareth Bale","Mesut Özil","Sadio Mané","Didier Drogba","Frank Lampard","Steven Gerrard","Paul Scholes","Alan Shearer","Ian Wright","Robin van Persie","Arjen Robben","Franck Ribéry","Andrea Pirlo","Kaká","Rivaldo","Ronaldo Nazário","Pelé","Diego Maradona"
+];
+const popularClubs=["Arsenal","Aston Villa","AFC Bournemouth","Brentford","Brighton & Hove Albion","Chelsea","Crystal Palace","Everton","Fulham","Liverpool","Manchester City","Manchester United","Newcastle United","Nottingham Forest","Tottenham Hotspur","West Ham United","Wolverhampton Wanderers","Barcelona","Real Madrid","Atlético Madrid","Athletic Club","Girona","Sevilla","Valencia","Villarreal","Bayern München","Borussia Dortmund","Bayer Leverkusen","RB Leipzig","VfB Stuttgart","Paris Saint-Germain","Marseille","Monaco","Lyon","Lille","Inter","AC Milan","Juventus","Napoli","Roma","Lazio","Atalanta","Fiorentina","Ajax","PSV","Feyenoord","Benfica","Porto","Sporting CP","Celtic","Rangers","AGF","FC København","Brøndby IF","FC Midtjylland","FC Nordsjælland","Silkeborg IF","Randers FC","Viborg FF","OB","AaB","Sønderjyske","Vejle Boldklub","Real Sociedad","Boca Juniors","River Plate","Flamengo","Palmeiras","Al Nassr","Al Hilal","Inter Miami"];
 function attachFootballSuggestions(inputId,listId,kind){
  const input=$(inputId),list=$(listId);let timer=null,controller=null,lastQuery='';
+ const seed=kind==='player'?popularPlayers:popularClubs;
+ const norm=value=>value.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase();
+ function showMatches(extra=[]){
+  const q=norm(input.value.trim());if(q.length<2){list.replaceChildren();return}
+  const combined=[...seed,...extra],unique=new Map();
+  combined.filter(name=>{const n=norm(name);return n.startsWith(q)||n.split(/\\s+/).some(word=>word.startsWith(q))})
+   .forEach(name=>{const k=norm(name);if(!unique.has(k))unique.set(k,name)});
+  list.replaceChildren(...[...unique.values()].slice(0,20).map(name=>{const option=document.createElement('option');option.value=name;return option}));
+ }
  input.addEventListener('input',()=>{
-  const q=input.value.trim();clearTimeout(timer);
-  if(q.length<2){list.replaceChildren();return}
+  const q=input.value.trim();clearTimeout(timer);showMatches();
+  if(q.length<2)return;
   timer=setTimeout(async()=>{
    if(controller)controller.abort();controller=new AbortController();lastQuery=q;
    try{
-    // Søg på både engelsk og dansk. Wikidatas søge-API tillader op til 50 resultater pr. sprog.
     const makeUrl=lang=>'https://www.wikidata.org/w/api.php?action=wbsearchentities&search='+encodeURIComponent(q)+'&language='+lang+'&uselang=da&type=item&limit=50&format=json&origin=*';
     const responses=await Promise.all([fetch(makeUrl('en'),{signal:controller.signal}),fetch(makeUrl('da'),{signal:controller.signal})]);
     if(responses.some(response=>!response.ok))throw new Error('Search unavailable');
     const datasets=await Promise.all(responses.map(response=>response.json()));
     if(input.value.trim()!==lastQuery)return;
     const pattern=kind==='player'?/footballer|football player|association football|soccer player|soccer footballer|football striker|football midfielder|football defender|football goalkeeper|fodboldspiller/i:/football club|association football club|soccer club|football team|fodboldklub/i;
-    const merged=[...datasets.flatMap(data=>data.search||[])];
-    const unique=new Map();
-    merged.filter(item=>pattern.test(item.description||'')).forEach(item=>{if(item.label&&!unique.has(item.label.toLowerCase()))unique.set(item.label.toLowerCase(),item)});
-    const matches=[...unique.values()].slice(0,20);
-    list.replaceChildren(...matches.map(item=>{const option=document.createElement('option');option.value=item.label||'';option.label=item.description||'';return option}));
+    const remote=(datasets.flatMap(data=>data.search||[])).filter(item=>pattern.test(item.description||'')).map(item=>item.label).filter(Boolean);
+    showMatches(remote);
    }catch(error){if(error.name!=='AbortError')console.warn('CardVault suggestions unavailable',error)}
-  },350);
+  },300);
  });
 }
 attachFootballSuggestions('player','playerSuggestions','player');
