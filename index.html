@@ -153,21 +153,47 @@ function addVisibleAutocomplete(inputId,kind){
  async function searchPlayersOnline(q,id,localMatches){
   if(kind!=='player'||q.length<2)return;
   try{
-   const url='https://www.wikidata.org/w/api.php?action=wbsearchentities&search='+encodeURIComponent(input.value.trim())+'&language=en&uselang=en&limit=20&format=json&origin=*';
-   const response=await fetch(url);
+   const params=new URLSearchParams({
+    action:'wbsearchentities',
+    search:input.value.trim(),
+    language:'en',
+    uselang:'en',
+    limit:'30',
+    format:'json',
+    origin:'*'
+   });
+   const response=await fetch('https://www.wikidata.org/w/api.php?'+params.toString());
    if(!response.ok)throw new Error('Player search unavailable');
    const data=await response.json();
    if(id!==requestId||norm(input.value)!==q)return;
-   const footballTerms=/footballer|soccer player|association football|football player|goalkeeper|striker|midfielder|defender|forward/i;
-   const online=(data.search||[])
-    .filter(item=>item.label&&item.description&&footballTerms.test(item.description))
-    .map(item=>item.label);
+   // Wikidata search also returns objects (e.g. statues). Only accept entities
+   // whose actual Wikidata instance/type hierarchy identifies a footballer.
+   const candidates=(data.search||[]).filter(item=>{
+    const desc=(item.description||'').toLowerCase();
+    const label=(item.label||'').toLowerCase();
+    const isFootballer=/association football player|footballer|soccer player|professional football player|women's footballer|men's footballer/.test(desc);
+    const isClearlyNotPlayer=/statue|sculpture|film|song|album|book|video game|stadium|club|team|award|brand|museum|building|monument/.test(desc+' '+label);
+    return item.id&&item.label&&isFootballer&&!isClearlyNotPlayer;
+   }).slice(0,20);
+   const verified=await Promise.all(candidates.map(async item=>{
+    try{
+     const detailUrl='https://www.wikidata.org/wiki/Special:EntityData/'+encodeURIComponent(item.id)+'.json';
+     const detailResponse=await fetch(detailUrl);
+     if(!detailResponse.ok)return null;
+     const detail=await detailResponse.json();
+     const entity=detail.entities&&detail.entities[item.id];
+     const claims=entity&&entity.claims&&entity.claims.P106||[];
+     const occupations=claims.map(claim=>claim.mainsnak&&claim.mainsnak.datavalue&&claim.mainsnak.datavalue.value&&claim.mainsnak.datavalue.value.id).filter(Boolean);
+     // Q937857 = association football player; reject broad/ambiguous search hits.
+     return occupations.includes('Q937857')?item.label:null;
+    }catch(e){return null}
+   }));
+   if(id!==requestId||norm(input.value)!==q)return;
    const seen=new Set(localMatches.map(norm));
-   const extra=online.filter(name=>!seen.has(norm(name))&&!seen.has(norm(name)));
-   const combined=[...localMatches,...extra].slice(0,16);
-   show(combined,extra.length?'Spillere fra CardVault + global database':'Spillerforslag');
+   const extra=verified.filter(Boolean).filter(name=>!seen.has(norm(name)));
+   show([...localMatches,...extra].slice(0,16),extra.length?'Spillere fra CardVault + verificeret spillerdatabase':'Kun verificerede fodboldspillere');
   }catch(error){
-   // Den lokale søgning virker stadig, hvis den eksterne database er nede.
+   // Local suggestions remain available if the external source is unavailable.
   }
  }
  function update(){
