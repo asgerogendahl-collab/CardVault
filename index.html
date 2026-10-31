@@ -250,20 +250,27 @@ async function loadPlayerClubSuggestions(){
  if(name.length<3)return;
  playerClubLookupTimer=setTimeout(async()=>{
   try{
-   const params=new URLSearchParams({action:'wbsearchentities',search:name,language:'en',uselang:'en',limit:'10',format:'json',origin:'*'});
+   const params=new URLSearchParams({action:'wbsearchentities',search:name,language:'en',uselang:'en',limit:'20',format:'json',origin:'*'});
    const response=await fetch('https://www.wikidata.org/w/api.php?'+params.toString());
    if(!response.ok)throw new Error('Player lookup failed');
    const data=await response.json();
-   const candidate=(data.search||[]).find(item=>item.label&&item.label.toLowerCase()===name.toLowerCase())||(data.search||[])[0];
-   if(!candidate||token!==playerClubLookupToken)return;
-   const detailResponse=await fetch('https://www.wikidata.org/wiki/Special:EntityData/'+encodeURIComponent(candidate.id)+'.json');
-   if(!detailResponse.ok)throw new Error('Player details unavailable');
-   const detail=await detailResponse.json(),entity=detail.entities&&detail.entities[candidate.id],claims=entity&&entity.claims||{};
-   const idsFor=property=>(claims[property]||[]).map(claim=>claim.mainsnak&&claim.mainsnak.datavalue&&claim.mainsnak.datavalue.value&&claim.mainsnak.datavalue.value.id).filter(Boolean);
-   if(!idsFor('P31').includes('Q5')||!idsFor('P106').includes('Q937857'))return;
-   const clubIds=[...new Set(idsFor('P54'))];
-   if(!clubIds.length)return;
-   const labelParams=new URLSearchParams({action:'wbgetentities',ids:clubIds.join('|'),props:'labels',languages:'en',format:'json',origin:'*'});
+   const candidates=(data.search||[]).filter(item=>item.id&&item.label);
+   candidates.sort((a,b)=>(a.label.toLowerCase()===name.toLowerCase()?0:1)-(b.label.toLowerCase()===name.toLowerCase()?0:1));
+   let clubIds=[];
+   for(const candidate of candidates.slice(0,12)){
+    if(token!==playerClubLookupToken)return;
+    try{
+     const detailResponse=await fetch('https://www.wikidata.org/wiki/Special:EntityData/'+encodeURIComponent(candidate.id)+'.json');
+     if(!detailResponse.ok)continue;
+     const detail=await detailResponse.json(),entity=detail.entities&&detail.entities[candidate.id],claims=entity&&entity.claims||{};
+     const idsFor=property=>(claims[property]||[]).map(claim=>claim.mainsnak&&claim.mainsnak.datavalue&&claim.mainsnak.datavalue.value&&claim.mainsnak.datavalue.value.id).filter(Boolean);
+     if(!idsFor('P31').includes('Q5')||!idsFor('P106').includes('Q937857'))continue;
+     clubIds=idsFor('P54');
+     if(clubIds.length)break;
+    }catch(e){/* Try the next matching player entity. */}
+   }
+   if(token!==playerClubLookupToken||!clubIds.length)return;
+   const labelParams=new URLSearchParams({action:'wbgetentities',ids:[...new Set(clubIds)].join('|'),props:'labels',languages:'en',format:'json',origin:'*'});
    const labelResponse=await fetch('https://www.wikidata.org/w/api.php?'+labelParams.toString());
    if(!labelResponse.ok)throw new Error('Club labels unavailable');
    const labelData=await labelResponse.json();
